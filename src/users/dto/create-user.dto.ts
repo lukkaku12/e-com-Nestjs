@@ -1,5 +1,12 @@
+import { IsOptional, IsString } from "class-validator";
+
 export class createUserDto {
-    name:string;
-    password:string;
-    role:string;
+    @IsString()
+    readonly name:string;
+
+    @IsString()
+    readonly password:string;
+    @IsOptional()
+    @IsString()
+    readonly role?:string;
 }

@@ -1,5 +1,5 @@
 
-import { Injectable } from '@nestjs/common';
+import { GatewayTimeoutException, HttpCode, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
@@ -21,21 +21,26 @@ export class UsersService {
   }
 
   async createUser(user: Partial<User>): Promise<User> {
-    const newUser = this.usersRepository.create(user);
     try {
+      const newUser = this.usersRepository.create(user);
       // Hashea la contraseña
       newUser.password = await bcrypt.hash(user.password, 10);
+      return await this.usersRepository.save(newUser);
     } catch (error) {
-      console.error('Error hashing password:', error);
-      throw new Error('Failed to hash password');
+      
+      throw new GatewayTimeoutException('Failed to hash password');
     }
 
-    return await this.usersRepository.save(newUser);
   }
 
   async updateUser(id: number, user: Partial<User>): Promise<User> {
-    await this.usersRepository.update(id, user);
-    return this.getUserById(id);
+    try {
+      await this.usersRepository.update(id, user);
+      return this.getUserById(id);
+      
+    } catch (error) {
+      throw new HttpException('Failed to update user', HttpStatus.BAD_REQUEST)
+    }
   }
 
   async deleteUser(id: number): Promise<void> {

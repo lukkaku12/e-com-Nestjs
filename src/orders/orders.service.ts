@@ -41,6 +41,6 @@ export class OrdersService {
     const order = this.ordersRepository.create(test);
 
     // Guardar el pedido
-    return this.ordersRepository.save(order);
+    return await this.ordersRepository.save(order);
   }
 }

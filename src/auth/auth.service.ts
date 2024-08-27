@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -8,39 +8,42 @@ import LoginResponse from './interfaces/auth.interface';
 
 @Injectable()
 export class AuthService {
-    constructor(@InjectRepository(User) private usersRepository:Repository<User>) {}
+  constructor(@InjectRepository(User) private usersRepository: Repository<User>) {}
 
-    async Login(user: Partial<User>): Promise<LoginResponse> {
-        try {
-            // Encuentra el usuario por nombre
-            const userFound = await this.usersRepository.findOneBy({ name: user.name });
-            if (!userFound) {
-                throw new Error('Usuario no encontrado');
-            }
-
-            // Compara la contraseña proporcionada con la almacenada
-            const isPasswordValid = await bcrypt.compare(user.password, userFound.password);
-            console.log(isPasswordValid)
-            if (!isPasswordValid) {
-                throw new Error('Contraseña incorrecta');
-            }
-
-            // Devuelve un JWT si la autenticación es exitosa
-            return { status: 200, response:this.parseUser(userFound)};
-            
-        } catch (error) {
-            // Maneja errores y lanza excepciones adecuadas
-            throw new Error(`Error en el login: ${error.message}`);
-        }
+  async validateUser(name: string, password: string): Promise<User | null> {
+    const userFound = await this.usersRepository.findOneBy({ name });
+    if (!userFound) {
+      return null; // Retorna null si el usuario no se encuentra
     }
 
-    parseUser(user: Partial<User>) {
-        return jwt.sign({user}, "whatever", {expiresIn: '1h'})
+    const isPasswordValid = await bcrypt.compare(password, userFound.password);
+    if (!isPasswordValid) {
+      return null; // Retorna null si la contraseña no es válida
     }
 
-    verifyAuthenticity(token: string) {
-        const result = jwt.verify(token, 'whatever');
-        if (!result) return;
-        return true;
+    return userFound; // Retorna el usuario si es válido
+  }
+
+  async validateUserById(id: number): Promise<User | null> {
+    return await this.usersRepository.findOneBy({ id }); // Valida al usuario por ID
+  }
+
+  async login(user: Partial<User>): Promise<LoginResponse> {
+    const userFound = await this.usersRepository.findOneBy({ name: user.name });
+    if (!userFound) {
+      throw new NotFoundException('Usuario no encontrado');
     }
+
+    return { status: 200, response: this.parseUser(userFound) }; // Devuelve un JWT si la autenticación es exitosa
+  }
+
+  parseUser(user: Partial<User>) {
+    return jwt.sign({ user: { id: user.id, name: user.name } }, 'whatever', { expiresIn: '1h' }); // Incluye el ID y el nombre en el payload del token
+  }
+
+  verifyAuthenticity(token: string) {
+    const result = jwt.verify(token, 'whatever');
+    if (!result) return false;
+    return true;
+  }
 }
